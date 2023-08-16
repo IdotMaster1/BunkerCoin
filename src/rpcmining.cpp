@@ -91,7 +91,7 @@ Value GetNetworkHashPS(int lookup, int height) {
     uint256 workDiff = pb->nChainWork - pb0->nChainWork;
     int64_t timeDiff = maxTime - minTime;
 
-    return (boost::int64_t)(workDiff.getdouble() / timeDiff);
+    return (int64_t)(workDiff.getdouble() / timeDiff);
 }
 
 Value getnetworkhashps(const Array& params, bool fHelp)
@@ -207,6 +207,8 @@ Value setgenerate(const Array& params, bool fHelp)
     else // Not -regtest: start generate thread, return immediately
     {
         mapArgs["-gen"] = (fGenerate ? "1" : "0");
+        GenerateDigiBytes(fGenerate, pwalletMain, nGenProcLimit);
+        mapArgs ["-genproclimit"] = itostr(nGenProcLimit);
         GenerateBitcoins(fGenerate, pwalletMain, nGenProcLimit);
     }
 
@@ -228,8 +230,8 @@ Value gethashespersec(const Array& params, bool fHelp)
         );
 
     if (GetTimeMillis() - nHPSTimerStart > 8000)
-        return (boost::int64_t)0;
-    return (boost::int64_t)dHashesPerSec;
+        return (int64_t)0;
+    return (int64_t)dHashesPerSec;
 }
 #endif
 
@@ -262,10 +264,17 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("blocks",           (int)chainActive.Height()));
     obj.push_back(Pair("currentblocksize", (uint64_t)nLastBlockSize));
     obj.push_back(Pair("currentblocktx",   (uint64_t)nLastBlockTx));
-    obj.push_back(Pair("difficulty",       (double)GetDifficulty()));
     obj.push_back(Pair("errors",           GetWarnings("statusbar")));
     obj.push_back(Pair("genproclimit",     (int)GetArg("-genproclimit", -1)));
-    obj.push_back(Pair("networkhashps",    getnetworkhashps(params, false)));
+    obj.push_back(Pair("pow_algo_id",        miningAlgo));
+    obj.push_back(Pair("pow_algo",           GetAlgoName(miningAlgo)));
+    obj.push_back(Pair("difficulty",         (double)GetDifficulty(NULL, miningAlgo)));
+    obj.push_back(Pair("difficulty_sha256d", (double)GetDifficulty(NULL, ALGO_SHA256D)));
+    obj.push_back(Pair("difficulty_scrypt",  (double)GetDifficulty(NULL, ALGO_SCRYPT)));
+    obj.push_back(Pair("difficulty_groestl", (double)GetDifficulty(NULL, ALGO_GROESTL)));
+    obj.push_back(Pair("difficulty_skein",   (double)GetDifficulty(NULL, ALGO_SKEIN)));
+    obj.push_back(Pair("difficulty_qubit",   (double)GetDifficulty(NULL, ALGO_QUBIT)));
+//    obj.push_back(Pair("networkhashps",    getnetworkhashps(params, false)));
     obj.push_back(Pair("pooledtx",         (uint64_t)mempool.size()));
     obj.push_back(Pair("testnet",          TestNet()));
 #ifdef ENABLE_WALLET
@@ -338,7 +347,7 @@ Value getwork(const Array& params, bool fHelp)
             nStart = GetTime();
 
             // Create new block
-            pblocktemplate = CreateNewBlockWithKey(*pMiningKey);
+            pblocktemplate = CreateNewBlockWithKey(*pMiningKey, miningAlgo);
             if (!pblocktemplate)
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
             vNewBlockTemplate.push_back(pblocktemplate);
@@ -511,7 +520,7 @@ Value getblocktemplate(const Array& params, bool fHelp)
             pblocktemplate = NULL;
         }
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = CreateNewBlock(scriptDummy);
+        pblocktemplate = CreateNewBlock(scriptDummy, miningAlgo);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 

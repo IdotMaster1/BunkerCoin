@@ -14,7 +14,68 @@
 #include "serialize.h"
 #include "uint256.h"
 
+#include "hashgroestl.h"
+#include "hashskein.h"
+#include "hashqubit.h"
+
 #include <stdint.h>
+
+enum { 
+    ALGO_SHA256D = 0, 
+    ALGO_SCRYPT  = 1, 
+    ALGO_GROESTL = 2,
+    ALGO_SKEIN   = 3,
+    ALGO_QUBIT   = 4,
+    NUM_ALGOS };
+
+enum
+{
+    // primary version
+    BLOCK_VERSION_DEFAULT        = 1,
+
+    // algo
+    BLOCK_VERSION_ALGO           = (7 << 9),
+    BLOCK_VERSION_SHA256D        = (1 << 9),
+    BLOCK_VERSION_GROESTL        = (2 << 9),
+    BLOCK_VERSION_SKEIN          = (3 << 9),
+    BLOCK_VERSION_QUBIT          = (4 << 9),
+};
+
+inline int GetAlgo(int nVersion)
+{
+    switch (nVersion & BLOCK_VERSION_ALGO)
+    {
+        case 1:
+            return ALGO_SCRYPT;
+        case BLOCK_VERSION_SHA256:
+            return ALGO_SHA256D;
+        case BLOCK_VERSION_GROESTL:
+            return ALGO_GROESTL;
+        case BLOCK_VERSION_SKEIN:
+            return ALGO_SKEIN;
+        case BLOCK_VERSION_QUBIT:
+            return ALGO_QUBIT;
+    }
+    return ALGO_SCRYPT;
+}
+
+inline std::string GetAlgoName(int Algo)
+{
+    switch (Algo)
+    {
+        case ALGO_SHA256D:
+            return std::string("sha256d");
+        case ALGO_SCRYPT:
+            return std::string("scrypt");
+        case ALGO_GROESTL:
+            return std::string("groestl");
+        case ALGO_SKEIN:
+            return std::string("skein");
+        case ALGO_QUBIT:
+            return std::string("qubit");
+    }
+    return std::string("unknown");       
+}
 
 class CTransaction;
 
@@ -343,7 +404,7 @@ class CBlockHeader
 {
 public:
     // header
-    static const int CURRENT_VERSION=2;
+    static const int CURRENT_VERSION=BLOCK_VERSION_DEFAULT;
     int nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
@@ -383,12 +444,30 @@ public:
     }
 
     uint256 GetHash() const;
-    
-    uint256 GetPoWHash() const
+
+   // Note: we use explicitly provided algo instead of the one returned by GetAlgo(), because this can be a block
+    // from foreign chain (parent block in merged mining) which does not encode algo in its nVersion field.
+    uint256 GetPoWHash(int algo) const
     {
-        uint256 thash;
-        scrypt_1024_1_1_256(BEGIN(nVersion), BEGIN(thash));
-        return thash;
+        switch (algo)
+        {
+            case ALGO_SHA256D:
+                return GetHash();
+            case ALGO_SCRYPT:
+            {
+                uint256 thash;
+                // Caution: scrypt_1024_1_1_256 assumes fixed length of 80 bytes
+                scrypt_1024_1_1_256(BEGIN(nVersion), BEGIN(thash));
+                return thash;
+            }
+            case ALGO_GROESTL:
+                return HashGroestl(BEGIN(nVersion), END(nNonce));
+            case ALGO_SKEIN:
+                return HashSkein(BEGIN(nVersion), END(nNonce));
+            case ALGO_QUBIT:
+                return HashQubit(BEGIN(nVersion), END(nNonce));
+        }
+        return GetHash();
     }
 
     int64_t GetBlockTime() const

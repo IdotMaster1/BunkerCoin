@@ -71,7 +71,23 @@ BITCOIN_CORE_H = \
   util.h \
   version.h \
   walletdb.h \
-  wallet.h
+  wallet.h \
+  scrypt.h \
+  sph_blake.h \
+  sph_groestl.h \
+  sph_keccak.h \
+  sph_bmw.h \
+  sph_jh.h \
+  sph_skein.h \
+  sph_types.h \
+  sph_echo.h \
+  sph_luffa.h \
+  sph_simd.h \
+  sph_cubehash.h \
+  sph_shavite.h \
+  hashgroestl.h \
+  hashskein.h \
+  hashqubit.h
 
 JSON_H = \
   json/json_spirit.h \
@@ -141,7 +157,26 @@ libbitcoin_common_a_SOURCES = \
   sync.cpp \
   util.cpp \
   version.cpp \
+  scrypt.cpp \
+  scrypt-sse2.cpp \
+  blake.c \
+  bmw.c \
+  groestl.c \
+  jh.c \
+  keccak.c \
+  skein.c \
+  aes_helper.c \
+  echo.c \
+  luffa.c \
+  simd.c \
+  cubehash.c \
+  shavite.c \
   $(BITCOIN_CORE_H)
+
+if GLIBC_BACK_COMPAT
+libbitcoin_common_a_SOURCES += compat/glibc_compat.cpp
+libbitcoin_common_a_SOURCES += compat/glibcxx_compat.cpp
+endif
 
 libbitcoin_cli_a_SOURCES = \
   rpcclient.cpp \
